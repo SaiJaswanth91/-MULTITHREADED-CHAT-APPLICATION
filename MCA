@@ -1,0 +1,115 @@
+package Clint;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+
+// Task 3: Client-Server Chat Application using Java Sockets and Multithreading
+public class ClintServer {
+    private static final int PORT = 3168; // Port for communication
+    private static Set<PrintWriter> clientWriters = Collections.synchronizedSet(new HashSet<>());
+
+    // ================= SERVER CODE =================
+    public static void startServer() {
+        System.out.println("Chat Server started on port " + PORT + "...");
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            while (true) {
+                Socket socket = serverSocket.accept();
+                System.out.println("New client connected!");
+                new ClientHandler(socket).start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Handles each client in a separate thread
+    private static class ClientHandler extends Thread {
+        private Socket socket;
+        private PrintWriter out;
+        private BufferedReader in;
+
+        public ClientHandler(Socket socket) {
+            this.socket = socket;
+        }
+
+        public void run() {
+            try {
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                out = new PrintWriter(socket.getOutputStream(), true);
+
+                clientWriters.add(out);
+
+                String message;
+                while ((message = in.readLine()) != null) {
+                    System.out.println("Received: " + message); // Server log
+                    broadcast(message);
+                }
+            } catch (IOException e) {
+                System.out.println("Client disconnected.");
+            } finally {
+                try { socket.close(); } catch (IOException e) { e.printStackTrace(); }
+                clientWriters.remove(out);
+            }
+        }
+
+        // Send message to all connected clients
+        private void broadcast(String message) {
+            synchronized (clientWriters) {
+                for (PrintWriter writer : clientWriters) {
+                    writer.println(message);
+                }
+            }
+        }
+    }
+
+    // ================= CLIENT CODE =================
+    public static void startClient(String serverAddress) {
+        try (Socket socket = new Socket(serverAddress, PORT);
+             BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in));
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+
+            System.out.println("Connected to chat server. Start typing messages...");
+
+            // Thread for receiving messages
+            new Thread(() -> {
+                String serverMessage;
+                try {
+                    while ((serverMessage = in.readLine()) != null) {
+                        System.out.println("Message: " + serverMessage);
+                    }
+                } catch (IOException e) {
+                    System.out.println("Connection closed.");
+                }
+            }).start();
+
+            // Sending messages
+            String input;
+            while ((input = userInput.readLine()) != null) {
+                out.println(input); // send to server
+            }
+
+        } catch (IOException e) {
+            System.out.println("Could not connect to server.");
+            e.printStackTrace();
+        }
+    }
+
+    // ================= MAIN METHOD =================
+    public static void main(String[] args) {
+        if (args.length == 0) {
+            System.out.println("Usage:");
+            System.out.println("  java ClintServer server   -> start server");
+            System.out.println("  java ClintServer client   -> start client (connects to localhost)");
+            return;
+        }
+
+        if (args[0].equalsIgnoreCase("server")) {
+            startServer();
+        } else if (args[0].equalsIgnoreCase("client")) {
+            startClient("localhost"); // use "localhost" or server IP
+        } else {
+            System.out.println("Invalid option! Use 'server' or 'client'.");
+        }
+    }
+}
