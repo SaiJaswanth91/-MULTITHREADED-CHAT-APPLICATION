@@ -57,3 +57,4 @@ The server continuously logs all received messages for monitoring purposes.
 The architecture can be extended to support usernames, private chats, or even a graphical user interface (GUI).
 
 Output :
+<img width="649" height="324" alt="Image" src="https://github.com/user-attachments/assets/1340d72b-d04b-4713-b5d4-1a2cb758cdc4" />
